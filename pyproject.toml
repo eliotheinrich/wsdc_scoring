@@ -22,8 +22,8 @@ wheel.py-api = "cp312"
 cmake.verbose = true
 
 [tool.scikit-build.cmake.define]
-UTILS_SOURCE="/data/heinriea/utils"
-DATAFRAME_SOURCE="/data/heinriea/dataframe"
+#UTILS_SOURCE="/data/heinriea/utils"
+#DATAFRAME_SOURCE="/data/heinriea/dataframe"
 
 [tool.cibuildwheel]
 build-verbosity = 1

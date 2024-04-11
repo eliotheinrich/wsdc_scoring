@@ -16,7 +16,7 @@ message("Compiler: " ${CMAKE_CXX_COMPILER})
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 #set(CMAKE_DEBUG_POSTFIX "d")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wno-unused-function -Wno-deprecated-declarations -pthread -fopenmp")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wno-unused-function -Wno-deprecated-declarations -pthread")
 
 # Ignore annoying Intel warnings
 if (${CMAKE_CXX_COMPILER_ID} STREQUAL "Intel")
@@ -72,7 +72,7 @@ nanobind_add_module(
     STABLE_ABI
     NB_STATIC
     src/PyWSDC.cpp
-    src/ScoreSheetConfig.cpp
+    src/ScoreSheetConfig.hpp
 )
 
 set_target_properties(wsdc_bindings PROPERTIES POSITION_INDEPENDENT_CODE ON)

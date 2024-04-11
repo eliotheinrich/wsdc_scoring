@@ -2,6 +2,40 @@
 
 #include "Frame.h"
 
+
+template<typename T>
+static std::vector<size_t> argsort(const std::vector<T> &array) {
+    std::vector<size_t> indices(array.size());
+    std::iota(indices.begin(), indices.end(), 0);
+    std::sort(indices.begin(), indices.end(),
+              [&array](int left, int right) -> bool {
+                  // sort indices according to corresponding array element
+                  return array[left] < array[right];
+              });
+
+    return indices;
+}
+
+static double swap_distance(std::vector<size_t>& r1, std::vector<size_t>& r2) {
+  double wrong_count = 0;
+
+  for (size_t i1 = 0; i1 < r1.size(); i1++) {
+    size_t i2;
+    for (size_t k = 0; k < r2.size(); k++) {
+      if (r2[k] == r2[i1]) {
+        i2 = k;
+        break;
+      }
+    }
+
+    if (i1 != i1) {
+      wrong_count++;
+    }
+  }
+
+  return wrong_count / 2.0;
+}
+
 class ScoreSheet {
   private:
     size_t num_judges;
@@ -18,11 +52,13 @@ class ScoreSheet {
 
     ScoreSheet(size_t num_judges, size_t num_competitors, size_t num_mutations, std::minstd_rand& rng) : ScoreSheet(num_judges, num_competitors) {
       for (size_t i = 0; i < num_mutations; i++) {
-        random_mutation(rng, true);
+        auto [j, i1i2] = generate_random_mutation(rng, true);
+        auto [i1, i2] = i1i2;
+        apply_mutation(j, i1, i2);
       }
     }
 
-    void random_mutation(std::mindstd_rand& rng, bool local) {
+    std::pair<size_t, std::pair<size_t, size_t>> generate_random_mutation(std::minstd_rand& rng, bool local) {
       size_t j = rng() % num_judges;
       size_t i1, i2;
       if (local) {
@@ -35,7 +71,19 @@ class ScoreSheet {
         }
       }
 
+      return {j, {i1, i2}};
+    }
+
+    void apply_mutation(size_t j, size_t i1, size_t i2) {
       std::swap(table[j][i1], table[j][i2]);
+    }
+
+    void apply_mutation(size_t j, std::vector<size_t>& s) {
+      std::vector<size_t> tmp(table[j]);
+      for (size_t i = 0; i < num_competitors; i++) {
+        tmp[i] = table[s[i]];
+      }
+      table[j] = tmp;
     }
 
     bool distinct(std::vector<size_t>& v) {
@@ -50,12 +98,8 @@ class ScoreSheet {
           return false;
         }
       }
-
+      // Found no duplicates; return
       return true;
-    }
-
-    std::vector<size_t> argsort(auto& v) {
-      
     }
 
     std::vector<size_t> break_ties_by_comparison(std::vector<size_t>& inds) {
@@ -76,9 +120,13 @@ class ScoreSheet {
         best_scores[min_ind]--;
       }
 
+      auto sorted_inds = argsort(best_scores);
+      std::vector<size_t> to_return(inds.size());
+      for (size_t i = 0; i < inds.size(); i++) {
+        to_return[i] = sorted_inds[i];
+      }
 
-
-
+      return to_return;
     }
 
     std::vector<size_t> break_ties_by_sum(std::vector<size_t>& inds, std::vector<std::vector<size_t>>& ordinals, size_t i) {
@@ -210,7 +258,26 @@ class ScoreSheet {
         }
       }
     }
-}
+
+    double mutation_distance(size_t j, size_t i1, size_t i2) {
+      std::vector<size_t> r1 = placements();
+      apply_mutation(j, i1, i2);
+      std::vector<size_t> r2 = placements();
+      apply_mutation(j, i1, i2);
+      return swap_distance(r1, r2);
+    }
+
+    std::vector<double> mutation_distance(size_t num_samples, std::minstd_rand& rng) {
+      std::vector<double> samples(num_samples);
+      for (size_t i = 0; i < num_samples; i++) {
+        auto [j, inds] = generate_random_mutation(rng, false);
+        auto [i1, i2] = inds;
+        samples[i] = mutation_distance(j, i1, i2);
+      }
+
+      return samples;
+    }
+};
 
 
 class ScoreSheetConfig : public dataframe::Config {
@@ -219,6 +286,8 @@ class ScoreSheetConfig : public dataframe::Config {
     size_t num_competitors;
     
     size_t num_mutations;
+    size_t num_samples;
+    size_t num_tables;
 
     std::minstd_rand rng;
 
@@ -230,24 +299,13 @@ class ScoreSheetConfig : public dataframe::Config {
       return double(rng())/double(RAND_MAX);
     }
 
-    std::shared_ptr<ParityCheckMatrix> generate_regular_interaction_matrix() {
-      Graph<int> g = Graph<int>::random_regular_graph(system_size, k, &rng);
-      std::shared_ptr<ParityCheckMatrix> A = std::make_shared<ParityCheckMatrix>(system_size, system_size);
-
-      for (size_t a = 0; a < g.num_vertices; a++) {
-        if (randf() < pr) {
-          A->set(a, a, 1);
-          for (auto const& [i, _] : g.edges[a]) {
-            A->set(a, i, 1);
-          }
-        }
-      }
-
-      return A;
-    }
-
 	public:
     ScoreSheetConfig(dataframe::Params &params) : dataframe::Config(params), sampler(params) {
+      num_judges = dataframe::utils::get<int>(params, "num_judges");
+      num_competitors = dataframe::utils::get<int>(params, "num_competitors");
+      num_mutations = dataframe::utils::get<int>(params, "num_mutations");
+      num_samples = dataframe::utils::get<int>(params, "num_samples", 1);
+      num_tables = dataframe::utils::get<int>(params, "num_tables", 1);
 
       int seed = dataframe::utils::get<int>(params, "seed", 0);
       if (seed == 0) {
@@ -263,7 +321,23 @@ class ScoreSheetConfig : public dataframe::Config {
     ~ScoreSheetConfig()=default;
 
     virtual dataframe::DataSlide compute(uint32_t num_threads) {
+      DataSlide slide;
+
       auto start = std::chrono::high_resolution_clock::now();
+
+      slide.add_data("instability");
+      for (size_t i = 0; i < num_tables; i++) {
+        ScoreSheet T(num_judges, num_competitors, num_mutations, rng);
+
+        std::vector<double> instability = T.mutation_distance(num_samples, rng);
+        slide.push_data("instability", instability);
+      }
+
+      auto end = std::chrono::high_resolution_clock::now();
+      std::chrono::duration<double, std::micro> duration = end - start;
+
+      slide.add_data("time", duration.count());
+
 
       return slide;
     }
