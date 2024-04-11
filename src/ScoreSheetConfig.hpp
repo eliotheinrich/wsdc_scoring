@@ -28,13 +28,30 @@ static double swap_distance(std::vector<size_t>& r1, std::vector<size_t>& r2) {
       }
     }
 
-    if (i1 != i1) {
+    if (i1 != i2) {
       wrong_count++;
     }
   }
 
   return wrong_count / 2.0;
 }
+
+static bool distinct(std::vector<size_t>& v) {
+  std::vector<size_t> t1(v);
+  std::vector<size_t> t2;
+  std::sort(t1.begin(), t1.end());
+  for (size_t i = 0; i < t1.size(); i++) {
+    if (std::find(t2.begin(), t2.end(), t1[i]) == t2.end()) {
+      t2.push_back(t1[i]);
+    } else {
+      // Found a duplicate; return early
+      return false;
+    }
+  }
+  // Found no duplicates; return
+  return true;
+}
+
 
 class ScoreSheet {
   private:
@@ -58,9 +75,37 @@ class ScoreSheet {
       }
     }
 
+    std::string to_string() const {
+      std::string s = "[";
+      for (size_t i = 0; i < num_judges; i++) {
+        if (i != 0) {
+          s += " ";
+        }
+
+        s += "[";
+
+        for (size_t j = 0; j < num_competitors; j++) {
+          s += std::to_string(table[i][j]);
+          if (j != num_competitors - 1) {
+            s += " ";
+          }
+        }
+
+        s += "]";
+        if (i == num_judges - 1) {
+          s += "]";
+        } else {
+          s += "],\n";
+        }
+      }
+
+      return s;
+    }
+
     std::pair<size_t, std::pair<size_t, size_t>> generate_random_mutation(std::minstd_rand& rng, bool local) {
       size_t j = rng() % num_judges;
-      size_t i1, i2;
+      size_t i1 = 0;
+      size_t i2 = 0;
       if (local) {
         i1 = rng() % (num_competitors - 2) + 1;
         i2 = (rng() % 2) ? (i1 - 1) : (i1 + 1);
@@ -81,28 +126,12 @@ class ScoreSheet {
     void apply_mutation(size_t j, std::vector<size_t>& s) {
       std::vector<size_t> tmp(table[j]);
       for (size_t i = 0; i < num_competitors; i++) {
-        tmp[i] = table[s[i]];
+        tmp[i] = table[j][s[i]];
       }
       table[j] = tmp;
     }
 
-    bool distinct(std::vector<size_t>& v) {
-      std::vector<size_t> t1(v);
-      std::vector<size_t> t2;
-      std::sort(t1.begin(), t1.end());
-      for (size_t i = 0; i < t1.size(); i++) {
-        if (std::find(t2.begin(), t2.end(), t1[i]) == contained.end()) {
-          t2.push_back(t1[i]);
-        } else {
-          // Found a duplicate; return early
-          return false;
-        }
-      }
-      // Found no duplicates; return
-      return true;
-    }
-
-    std::vector<size_t> break_ties_by_comparison(std::vector<size_t>& inds) {
+    std::vector<size_t> break_ties_by_comparison(const std::vector<size_t>& inds) const {
       std::vector<int> best_scores(inds.size(), 0);
 
       for (size_t j = 0; j < num_judges; j++) {
@@ -129,7 +158,7 @@ class ScoreSheet {
       return to_return;
     }
 
-    std::vector<size_t> break_ties_by_sum(std::vector<size_t>& inds, std::vector<std::vector<size_t>>& ordinals, size_t i) {
+    std::vector<size_t> break_ties_by_sum(const std::vector<size_t>& inds, const std::vector<std::vector<size_t>>& ordinals, size_t i) const {
       std::vector<size_t> sums(inds.size(), 0);
 
       size_t placements_considered = i + 1;
@@ -144,8 +173,9 @@ class ScoreSheet {
       while (!distinct(sums) && placements_considered < num_competitors) {
         for (size_t j = 0; j < inds.size(); j++) {
           size_t ij = inds[j];
-          sum[j] += ordinals[id][placements_considered];
+          sums[j] += ordinals[ij][placements_considered];
           placements_considered++;
+        }
       }
 
       std::map<size_t, std::vector<size_t>> partition;
@@ -162,7 +192,7 @@ class ScoreSheet {
       for (auto const& [k, v] : partition) {
         std::vector<size_t> to_place;
         if (v.size() == 1) {
-          to_place = v[0];
+          to_place = v;
         } else {
           to_place = break_ties_by_comparison(v);
         }
@@ -171,19 +201,17 @@ class ScoreSheet {
           placements.push_back(c);
         }
       }
-
       return placements;
-      
     }
 
-    std::vector<size_t> break_ties(std::vector<size_t>& inds, std::vector<std::vector<size_t>>& ordinals, size_t i) {
+    std::vector<size_t> break_ties(const std::vector<size_t>& inds, const std::vector<std::vector<size_t>>& ordinals, size_t i) const {
       if (inds.size() == 1) {
         return inds;
       }
 
       std::vector<size_t> placement_at_i(inds.size());
       for (size_t j = 0; j < inds.size(); j++) {
-        placements_at_i[j] = ordinals[inds[j]][i];
+        placement_at_i[j] = ordinals[inds[j]][i];
       }
 
       std::map<size_t, std::vector<size_t>> partition;
@@ -200,7 +228,7 @@ class ScoreSheet {
       for (auto const& [k, v] : partition) {
         std::vector<size_t> to_place;
         if (v.size() == 1) {
-          to_place = v[0];
+          to_place = v;
         } else {
           to_place = break_ties_by_sum(v, ordinals, i);
         }
@@ -226,6 +254,8 @@ class ScoreSheet {
           ordinals[i][j] = k;
         }
       }
+
+      return ordinals;
     }
 
     std::vector<size_t> placements() {
@@ -257,12 +287,18 @@ class ScoreSheet {
           mask[j] = false;
         }
       }
+
+      return ranking;
     }
 
     double mutation_distance(size_t j, size_t i1, size_t i2) {
       std::vector<size_t> r1 = placements();
+      std::cout << "before mutation: \n" << to_string() << "\n";
+      std::cout << "[ "; for (auto r : r1) { std::cout << r << " "; } std::cout << "]\n";
       apply_mutation(j, i1, i2);
       std::vector<size_t> r2 = placements();
+      std::cout << "after mutation: \n" << to_string() << "\n";
+      std::cout << "[ "; for (auto r : r2) { std::cout << r << " "; } std::cout << "]\n";
       apply_mutation(j, i1, i2);
       return swap_distance(r1, r2);
     }
@@ -300,7 +336,7 @@ class ScoreSheetConfig : public dataframe::Config {
     }
 
 	public:
-    ScoreSheetConfig(dataframe::Params &params) : dataframe::Config(params), sampler(params) {
+    ScoreSheetConfig(dataframe::Params &params) : dataframe::Config(params) {
       num_judges = dataframe::utils::get<int>(params, "num_judges");
       num_competitors = dataframe::utils::get<int>(params, "num_competitors");
       num_mutations = dataframe::utils::get<int>(params, "num_mutations");
@@ -321,13 +357,14 @@ class ScoreSheetConfig : public dataframe::Config {
     ~ScoreSheetConfig()=default;
 
     virtual dataframe::DataSlide compute(uint32_t num_threads) {
-      DataSlide slide;
+      dataframe::DataSlide slide;
 
       auto start = std::chrono::high_resolution_clock::now();
 
       slide.add_data("instability");
       for (size_t i = 0; i < num_tables; i++) {
         ScoreSheet T(num_judges, num_competitors, num_mutations, rng);
+        std::cout << T.to_string() << std::endl;
 
         std::vector<double> instability = T.mutation_distance(num_samples, rng);
         slide.push_data("instability", instability);
@@ -336,7 +373,8 @@ class ScoreSheetConfig : public dataframe::Config {
       auto end = std::chrono::high_resolution_clock::now();
       std::chrono::duration<double, std::micro> duration = end - start;
 
-      slide.add_data("time", duration.count());
+      slide.add_data("time");
+      slide.push_data("time", duration.count());
 
 
       return slide;

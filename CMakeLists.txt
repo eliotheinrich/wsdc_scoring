@@ -83,3 +83,6 @@ install(
     LIBRARY DESTINATION pywsdc
 )
 
+add_executable(main src/test.cpp)
+target_include_directories(main PRIVATE src)
+target_link_libraries(main PRIVATE dataframe)
