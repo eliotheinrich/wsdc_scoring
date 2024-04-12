@@ -22,7 +22,7 @@ static double swap_distance(std::vector<size_t>& r1, std::vector<size_t>& r2) {
   for (size_t i1 = 0; i1 < r1.size(); i1++) {
     size_t i2;
     for (size_t k = 0; k < r2.size(); k++) {
-      if (r2[k] == r2[i1]) {
+      if (r2[k] == r1[i1]) {
         i2 = k;
         break;
       }
@@ -274,8 +274,8 @@ class ScoreSheet {
 
         std::vector<size_t> to_place;
         for (size_t j = 0; j < num_competitors; j++) {
-          if (mask[i] && scores[i] > num_judges/2) {
-            to_place.push_back(i);
+          if (mask[j] && scores[j] > num_judges/2) {
+            to_place.push_back(j);
           }
         }
 

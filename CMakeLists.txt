@@ -77,6 +77,7 @@ nanobind_add_module(
 
 set_target_properties(wsdc_bindings PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_include_directories(wsdc_bindings PRIVATE src)
+target_link_libraries(wsdc_bindings PRIVATE dataframe)
 
 install(
     TARGETS wsdc_bindings
